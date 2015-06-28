@@ -37,6 +37,9 @@
 <!-- BEGIN_INCLUDE(GoogleSpreadSheets:get-column-headers) -->
 	<google-spreadsheets:get-column-headers spreadsheet="My mule Spreadsheet" worksheet="My mule worksheet" />
 <!-- END_INCLUDE(GoogleSpreadSheets:get-column-headers) -->
+<!-- BEGIN_INCLUDE(GoogleSpreadSheets:get-row) -->
+	<google-spreadsheets:get-row spreadsheet="My mule Spreadsheet" worksheet="My mule worksheet" rowNum="1"/>
+<!-- END_INCLUDE(GoogleSpreadSheets:get-row) -->
 <!-- BEGIN_INCLUDE(GoogleSpreadSheets:get-spreadsheets-by-title) -->
 	<google-spreadsheets:get-spreadsheets-by-title title="My mule Spreadsheet"/>
 <!-- END_INCLUDE(GoogleSpreadSheets:get-spreadsheets-by-title) -->

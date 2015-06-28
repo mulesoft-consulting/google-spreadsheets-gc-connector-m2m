@@ -542,6 +542,53 @@ public class GoogleSpreadSheetConnector {
     }
     
     /**
+     * This processor returns the a worksheet's first row
+     * 
+     * {@sample.xml ../../../doc/GoogleSpreadSheets-connector.xml.sample GoogleSpreadSheets:get-row}
+     * 
+     * @param spreadsheet the title of the spreadsheet from which the info should be taken from
+     * @param worksheet the title of the worksheet from which the info should be taken from
+     * @param spreadsheetIndex google's api allows for several spreadsheet to have the same name. In this cases
+     * 							it returns a list with all the ones matching the given title. Use this optional
+     * 							attribute to specify the zero-based list index of the want you want to use
+     * @param worksheetIndex google's api allows for several worksheets to have the same name. In this cases
+     * 							it returns a list with all the ones matching the given title. Use this optional
+     * 							attribute to specify the zero-based list index of the want you want to use
+     * 
+     * @param rowNum Row number
+     * 
+     * @return an instance of  {@link org.mule.module.google.spreadsheet.model.Row} is the worksheet has row at the given number, null otherwise
+     * @throws IOException if there's a communication error with google's servers
+     * @throws ServiceException if the operation raises an error on google's end
+     */
+    @Processor
+    public Row getRow(
+			String spreadsheet,
+    		String worksheet,
+            @Default("0") int spreadsheetIndex,
+            @Default("0") int worksheetIndex,
+            Integer rowNum) throws IOException, ServiceException {
+
+
+        WorksheetEntry worksheetEntry = this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex);
+    	
+		// Get the appropriate URL for a cell feed
+		URL cellFeedUrl = worksheetEntry.getCellFeedUrl();
+
+		// Create a query for the given row number
+		CellQuery cellQuery = new CellQuery(cellFeedUrl);
+		cellQuery.setMinimumRow(rowNum);
+		cellQuery.setMaximumRow(rowNum);
+
+		// Get the cell feed matching the query
+		CellFeed topRowCellFeed = this.spreadsheetService.query(cellQuery, CellFeed.class);
+
+		List<Row> rows = ModelParser.parseCell(topRowCellFeed);
+		
+		return rows.isEmpty() ? null : rows.get(0);
+    }
+    
+    /**
      * Returns a list of {@link org.mule.module.google.spreadsheet.model.Spreadsheet} with all the spreadsheets
      * associated with the user which title matches the one specified.
      * 
