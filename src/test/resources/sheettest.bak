@@ -1,0 +1,110 @@
+package com.test;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.security.GeneralSecurityException;
+import java.security.KeyStoreException;
+import java.security.PrivateKey;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.logging.Logger;
+import org.junit.Test;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.SecurityUtils;
+import com.google.gdata.client.spreadsheet.SpreadsheetService;
+import com.google.gdata.data.spreadsheet.CellEntry;
+import com.google.gdata.data.spreadsheet.CellFeed;
+import com.google.gdata.data.spreadsheet.WorksheetEntry;
+import com.google.gdata.data.spreadsheet.WorksheetFeed;
+import com.mw.insight.common.RetryHttpRequestInitializer;
+
+public class SheetsTest {
+
+	private static JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
+	private static HttpTransport httpFactory = null;
+	private static final Logger log = Logger.getLogger(SheetsTest.class.getName());
+
+	@Test
+	public void BigQueryBriggsTest() {
+
+    	try {
+    		httpFactory = GoogleNetHttpTransport.newTrustedTransport();
+
+    		final GoogleCredential credential =  getSheetsClientAuth();
+    		SpreadsheetService service = new SpreadsheetService("IoT - Pilot Participant Info");
+    		service.setOAuth2Credentials(credential);
+    		service.setProtocolVersion(SpreadsheetService.Versions.V3);
+
+    		// GEt Participant Info Spreadsheet
+    		URL SPREADSHEET_FEED_URL = new URL("https://spreadsheets.google.com/feeds/worksheets/1Pt8c3-own83d8vq_oIMC1xUNMti7rH5zdLECBw_abCE/private/full");
+  	    
+    	   	// Make a request to the API and get all spreadsheets.
+    		WorksheetFeed feed = service.getFeed(SPREADSHEET_FEED_URL, WorksheetFeed.class);
+    	    List<WorksheetEntry> worksheets = feed.getEntries();
+
+    	    // Iterate through all of the spreadsheets returned
+    		for (WorksheetEntry worksheet : worksheets) {
+        		// Print the title of this spreadsheet to the screen
+    			if (worksheet.getTitle().getPlainText().equalsIgnoreCase("PARTICIPANTS")) {
+            		System.out.println(worksheet.getTitle().getPlainText());
+
+            		URL cellFeedUrl = new URI(worksheet.getCellFeedUrl().toString() + "?min-row=6&min-col=1&max-col=15").toURL();
+            		CellFeed cellFeed = service.getFeed(cellFeedUrl, CellFeed.class);
+            		for (CellEntry cell : cellFeed.getEntries()) {
+        				int columnNbr = Integer.parseInt(cell.getId().substring(cell.getId().lastIndexOf('C') + 1));
+            			if (columnNbr == 15) {
+                			System.out.println(cell.getCell().getValue() + "\t");
+            			} else {
+                			System.out.print(cell.getCell().getValue() + "\t");
+            			}
+            		}
+    			}
+        	}
+   		} catch (IOException e) {
+       		System.out.println("IO Exception:  " + e.getMessage());
+       	} catch (GeneralSecurityException e) {
+       		System.out.println("Security Exception:  " + e.getMessage());
+       	} catch (Exception e) {
+           	System.out.println("ERROR" + e.getMessage());
+       	}
+       	System.out.println("Finished.");
+	}
+
+	  public static GoogleCredential getSheetsClientAuth() 
+			  throws IOException, GeneralSecurityException {
+		  Collection<String> scopes = getSheetsScopeList();
+		  String serviceAccount = "172704012371-kdr2g33gt8javcd7rtavo68fievainb8@developer.gserviceaccount.com";
+		  PrivateKey key = getPrivateKey();
+		  
+		  GoogleCredential credential = new GoogleCredential.Builder()
+		    .setRequestInitializer(new RetryHttpRequestInitializer(null))
+		    .setTransport(httpFactory)
+		    .setJsonFactory(jsonFactory)
+		    .setServiceAccountId(serviceAccount)
+		    .setServiceAccountPrivateKey(key)
+		    .setServiceAccountScopes(scopes)
+		    .build();  
+		  return credential;
+	  }
+	  
+	  private static PrivateKey getPrivateKey() throws KeyStoreException, IOException, GeneralSecurityException{
+		  FileInputStream fis = new FileInputStream("c:\\temp\\IoT Integration-600256fa256a.p12");
+		  PrivateKey key = SecurityUtils.loadPrivateKeyFromKeyStore(SecurityUtils.getPkcs12KeyStore(), fis, "notasecret", "privatekey", "notasecret");
+		  log.info("Key size: "+key.getEncoded().length);
+		  log.info("Key algorithm: "+key.getAlgorithm());
+		  return key;
+	  }
+	  
+	  private static Collection<String>  getSheetsScopeList(){
+		  Collection<String> scopes = new ArrayList<String>();
+		  scopes.add("https://spreadsheets.google.com/feeds");
+		  return scopes;
+	  }
+}
