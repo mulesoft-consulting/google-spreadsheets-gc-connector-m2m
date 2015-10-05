@@ -81,6 +81,8 @@ public class GoogleSpreadSheetConnector {
 	private SpreadsheetService spreadsheetService;
 	
 	private DocsService docService;
+	
+	private String applicationName;
 
 	/**
 	 * 
@@ -97,7 +99,8 @@ public class GoogleSpreadSheetConnector {
 			@Password String storePass, String alias, @Password String keyPass) 
 		throws ConnectionException {
 		
-		logger.info(String.format("Logging into Google BigQuery application %s.", applicationName));
+		logger.info(String.format("Logging into Google SpreadSheet application %s.", applicationName));
+		this.applicationName = applicationName;
 		
 		try {
 			InputStream in = this.getClass().getClassLoader().getResourceAsStream(privateKeyP12File);
@@ -114,21 +117,7 @@ public class GoogleSpreadSheetConnector {
 		            .setServiceAccountPrivateKey(key)
 		            .build();
 		    
-		    credential.refreshToken();
-		    accessToken = credential.getAccessToken();
-		    logger.trace("Assess token: " + credential.getAccessToken());
-		    
-    		this.spreadsheetService = new SpreadsheetService(applicationName);
-    		this.spreadsheetService.setOAuth2Credentials(credential);
-    		this.spreadsheetService.setProtocolVersion(SpreadsheetService.Versions.V3);
-		    
-	        logger.info("Sheet service client created: " + this.spreadsheetService.toString());
-			
-    		this.docService = new DocsService(applicationName);
-    		this.docService.setOAuth2Credentials(credential);
-    		this.docService.setProtocolVersion(DocsService.Versions.V3);
-		    
-	        logger.info("Sheet service client created: " + this.docService.toString());
+		    refreshServiceClient();
 
 		}
 		catch (Exception ex) {
@@ -192,7 +181,8 @@ public class GoogleSpreadSheetConnector {
      */
     @Processor
     public List<Spreadsheet> getAllSpreadsheets() throws OAuthException, IOException, ServiceException {
-        return ModelParser.parseSpreadsheet(this.spreadsheetService.getFeed(factory.getSpreadsheetsFeedUrl(), SpreadsheetFeed.class));
+		refreshServiceClient();
+    	return ModelParser.parseSpreadsheet(this.spreadsheetService.getFeed(factory.getSpreadsheetsFeedUrl(), SpreadsheetFeed.class));
     }
     
  
@@ -209,6 +199,7 @@ public class GoogleSpreadSheetConnector {
     @Processor
     public void createSpreadsheet(String title) throws OAuthException, IOException, ServiceException {
 
+		refreshServiceClient();
     	com.google.gdata.data.docs.SpreadsheetEntry newEntry = new com.google.gdata.data.docs.SpreadsheetEntry();
     	
     	newEntry.setTitle(new PlainTextConstruct(title));
@@ -231,6 +222,7 @@ public class GoogleSpreadSheetConnector {
     @Processor
     public List<Worksheet> getAllWorksheets(String spreadsheet, @Default("0") int spreadsheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         SpreadsheetEntry ss = this.getSpreadsheetEntry(spreadsheet, spreadsheetIndex);
     	return ModelParser.parseWorksheet(ss.getWorksheets());
     }
@@ -259,6 +251,7 @@ public class GoogleSpreadSheetConnector {
     		int rowCount,
     		int colCount) throws IOException, ServiceException {
     	
+		refreshServiceClient();
     	SpreadsheetEntry ss = this.getSpreadsheetEntry(spreadsheet, spreadsheetIndex);
     	WorksheetEntry ws = new WorksheetEntry();
     	ws.setTitle(new PlainTextConstruct(title));
@@ -292,6 +285,7 @@ public class GoogleSpreadSheetConnector {
                     @Default("0") int spreadsheetIndex,
                     @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         WorksheetEntry ws = this.getItem(this.getWorksheetEntriesByTitle(spreadsheet, worksheet, spreadsheetIndex), worksheetIndex);
     	ws.delete();
     }
@@ -333,6 +327,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int spreadsheetIndex,
             @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         WorksheetEntry ws = this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex);
 		
     	if (!StringUtils.isEmpty(title)) {
@@ -390,6 +385,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int worksheetIndex,
             @Default("false") boolean purge) throws Exception {
 
+		refreshServiceClient();
         if (rows == null || rows.isEmpty()) {
     		logger.warn("Worksheet contains no rows... skipping update and possible purge");
     		return;
@@ -459,6 +455,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int worksheetIndex,
             @Default("false") boolean purge) throws Exception {
 
+		refreshServiceClient();
         if (StringUtils.isEmpty(csv)) {
     		if (logger.isDebugEnabled()) {
     			logger.debug("received empty csv value... exiting without updating values nor purging");
@@ -493,8 +490,8 @@ public class GoogleSpreadSheetConnector {
      * @throws ServiceException if the operation raises an error on google's end
      */
     @Processor
-    public List<Person> getAuthors(String spreadsheet, @Default("0") int spreadsheetIndex) throws IOException, ServiceException {
-    	
+    public List<Person> getAuthors(String spreadsheet, @Default("0") int spreadsheetIndex) throws IOException, ServiceException {    	
+		refreshServiceClient();
     	return this.getSpreadsheetEntry(spreadsheet, spreadsheetIndex).getAuthors();
     }
     
@@ -523,7 +520,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int spreadsheetIndex,
             @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
-
+		refreshServiceClient();
         WorksheetEntry worksheetEntry = this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex);
     	
 		// Get the appropriate URL for a cell feed
@@ -569,7 +566,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int worksheetIndex,
             Integer rowNum) throws IOException, ServiceException {
 
-
+		refreshServiceClient();
         WorksheetEntry worksheetEntry = this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex);
     	
 		// Get the appropriate URL for a cell feed
@@ -601,6 +598,8 @@ public class GoogleSpreadSheetConnector {
      */
     @Processor
     public List<Spreadsheet> getSpreadsheetsByTitle(String title) throws IOException, ServiceException {
+
+    	refreshServiceClient();
     	SpreadsheetQuery spreadsheetQuery = new SpreadsheetQuery(factory.getSpreadsheetsFeedUrl());
         spreadsheetQuery.setTitleQuery(title);
         return ModelParser.parseSpreadsheet(this.spreadsheetService.query(spreadsheetQuery, SpreadsheetFeed.class));
@@ -628,6 +627,7 @@ public class GoogleSpreadSheetConnector {
     				    		String title,
                                 @Default("0") int spreadsheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         return ModelParser.parseWorksheet(this.getWorksheetEntriesByTitle(spreadsheet, title, spreadsheetIndex));
     }
     
@@ -654,6 +654,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int spreadsheetIndex,
             @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         WorksheetEntry worksheetEntry = this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex);
     	
     	CellFeed cellFeed = this.spreadsheetService.getFeed(worksheetEntry.getCellFeedUrl(), CellFeed.class);
@@ -688,6 +689,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int spreadsheetIndex,
             @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         WorksheetEntry worksheetEntry = this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex);
 
     	// Get the appropriate URL for a cell feed
@@ -730,6 +732,7 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int spreadsheetIndex,
             @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
+		refreshServiceClient();
         if (StringUtils.isEmpty(lineSeparator)) {
     		lineSeparator = "\n";
     	}
@@ -775,6 +778,7 @@ public class GoogleSpreadSheetConnector {
     		@Optional Integer minCol,
     		@Optional Integer maxCol) throws IOException, ServiceException {
       
+		refreshServiceClient();
     	CellQuery query = new CellQuery(this.getCellFeedUrl(spreadsheet, worksheet, spreadsheetIndex, worksheetIndex));
     	query.setMinimumRow(minRow);
 	    query.setMaximumRow(maxRow);
@@ -827,6 +831,7 @@ public class GoogleSpreadSheetConnector {
 			@Optional Integer minCol,
 			@Optional Integer maxCol) throws IOException, ServiceException {
     	
+		refreshServiceClient();
     	if (StringUtils.isEmpty(lineSeparator)) {
     		lineSeparator = "\n";
     	}
@@ -868,16 +873,18 @@ public class GoogleSpreadSheetConnector {
             @Default("0") int spreadsheetIndex,
             @Default("0") int worksheetIndex) throws IOException, ServiceException {
 
-        CellQuery cellQuery = new CellQuery(this.getCellFeedUrl(spreadsheet, worksheet, spreadsheetIndex, worksheetIndex));
-      cellQuery.setFullTextQuery(query);
+		refreshServiceClient();
+		CellQuery cellQuery = new CellQuery(this.getCellFeedUrl(spreadsheet, worksheet, spreadsheetIndex, worksheetIndex));
+		cellQuery.setFullTextQuery(query);
       
-      return ModelParser.parseCell(this.spreadsheetService.query(cellQuery, CellFeed.class));
+		return ModelParser.parseCell(this.spreadsheetService.query(cellQuery, CellFeed.class));
     }
     
     private SpreadsheetEntry getSpreadsheetEntry(
     		String spreadsheet,
     		int spreadsheetIndex) throws IOException, ServiceException {
     	
+		refreshServiceClient();
     	SpreadsheetQuery spreadsheetQuery = new SpreadsheetQuery(factory.getSpreadsheetsFeedUrl());
         spreadsheetQuery.setTitleQuery(spreadsheet);
     	return this.getItem(this.spreadsheetService.query(spreadsheetQuery, SpreadsheetFeed.class).getEntries(), spreadsheetIndex);
@@ -888,6 +895,7 @@ public class GoogleSpreadSheetConnector {
 											String worksheet,
 											int spreadsheetIndex) throws IOException, ServiceException {
     	
+		refreshServiceClient();
     	SpreadsheetEntry spreadsheetEntry = this.getSpreadsheetEntry(spreadsheet, spreadsheetIndex);
     	
     	WorksheetQuery worksheetQuery = new WorksheetQuery(spreadsheetEntry.getWorksheetFeedUrl());
@@ -902,6 +910,7 @@ public class GoogleSpreadSheetConnector {
     		int spreadsheetIndex,
     		int worksheetIndex) throws IOException, ServiceException {
     	
+		refreshServiceClient();
     	List<WorksheetEntry> worksheets = this.getWorksheetEntriesByTitle(spreadsheet, worksheet, spreadsheetIndex);
     	return this.getItem(worksheets, worksheetIndex);
     }
@@ -912,6 +921,7 @@ public class GoogleSpreadSheetConnector {
     		int spreadsheetIndex,
     		int worksheetIndex) throws IOException, ServiceException {
     	
+		refreshServiceClient();
     	return this.getWorksheetEntry(accessToken, spreadsheet, worksheet, spreadsheetIndex, worksheetIndex).getCellFeedUrl();
     }
     
@@ -926,4 +936,24 @@ public class GoogleSpreadSheetConnector {
     	return list.get(index);
     }
 	
+    /**
+     * Refresh client used for connection
+     */
+    private void refreshServiceClient() throws IOException {
+	    credential.refreshToken();
+	    accessToken = credential.getAccessToken();
+	    logger.trace("Assess token: " + credential.getAccessToken());
+	    
+		this.spreadsheetService = new SpreadsheetService(applicationName);
+		this.spreadsheetService.setOAuth2Credentials(credential);
+		this.spreadsheetService.setProtocolVersion(SpreadsheetService.Versions.V3);
+	    
+        logger.trace("Sheet service client created: " + this.spreadsheetService.toString());
+		
+		this.docService = new DocsService(applicationName);
+		this.docService.setOAuth2Credentials(credential);
+		this.docService.setProtocolVersion(DocsService.Versions.V3);
+	    
+        logger.trace("Sheet service client created: " + this.docService.toString());    	
+    }
 }
